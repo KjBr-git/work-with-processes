@@ -1,0 +1,78 @@
+#include <time.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h> 
+#include <sys/errno.h>
+#include <pthread.h>
+
+int main(int argc, char* argv[]) {
+	int SIZE = atoi(argv[1]), shmid;
+	char b[SIZE];
+	double t;
+	char* buf = b;
+	char* shmPtr;
+	clock_t start, finish;
+	pthread_mutex_t mutex;
+	pthread_mutex_init(&mutex, NULL);
+	key_t skey = 1234567;
+	int pid = fork();
+	if (pid == 0) {
+		if ((shmid = shmget(skey, SIZE, 0666)) == -1) {
+			perror("Shmget failed");
+			exit(1);
+		}
+		shmPtr = shmat(shmid, 0, 0);
+		if (shmPtr == (char*)-1) {
+			perror("Shmat failed");
+		}
+		pthread_mutex_lock(&mutex);
+		for (int i = 0; i < SIZE; i++) {
+			buf[i] = shmPtr[i];
+		}
+		pthread_mutex_unlock(&mutex);
+		shmdt(shmPtr);
+		exit(0);
+	}
+	else if (pid > 0) {
+		if ((shmid = shmget(skey, SIZE, 0666 | IPC_CREAT)) == -1) {
+			perror("Shmget failed");
+			exit(1);
+		}
+		shmPtr = shmat(shmid, 0, 0);
+		if (shmPtr == (char*)-1) {
+			perror("Shmat failed");
+		}
+		pthread_mutex_lock(&mutex);
+		start = clock();
+		for (int i = 0; i < SIZE; i++) {
+			shmPtr[i] = (rand() % 'z' + 'a');
+		}
+		pthread_mutex_unlock(&mutex);
+		shmdt(shmPtr);
+	}
+	else if (pid == -1) {
+		perror("Fork failed");
+		exit(1);
+	}
+	finish = clock();
+	wait(0);
+	if (shmctl(shmid, IPC_RMID, NULL) == -1) {
+		perror("Shmctl failed");
+		exit(-1);
+	}
+	if (SIZE >= (1024 * 1024))
+		printf("\nРазмер переданных данных: %f MB\n", (double)SIZE / (1024 * 1024));
+	else if (SIZE >= 1024)
+		printf("\nРазмер переданных данных: %f KB\n", (double)SIZE / 1024);
+	else  printf("\nРазмер переданных данных: %d B\n", SIZE);
+	printf("Начало передачи: %lf с\n", (double)start / CLOCKS_PER_SEC);
+	printf("Конец передачи: %lf с\n", (double)finish / CLOCKS_PER_SEC);
+	t = (double)(finish - start) / CLOCKS_PER_SEC;
+	printf("Время: %lf с\n", t);
+	printf("Скорость предачи данных %lf KB/с\n", (SIZE / t) / 1024);
+	return 0;
+}
