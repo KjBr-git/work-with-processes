@@ -1,0 +1,56 @@
+#include<stdio.h>
+#include<unistd.h>
+#include<time.h>
+#include<stdlib.h>
+#include <sys/wait.h>
+#include <sys/errno.h>
+
+void CreateProcess(int n) {
+	int pid;
+	char* exec_1[] = {"pg", NULL};
+	char* exec_3[] = {"ping","-c 1", "google.com", NULL};
+	time_t ttime = time(NULL); //фиксация времени создания порождения процесса
+	pid = fork(); //порождение нового процесса
+	if (pid == -1) { //проверка на сбой
+		perror("bad fork");
+		exit(1);}	
+	if (pid == 0) { //если процесс определил себя как child
+		printf("Child process (%d) PID: %d PPID: %d Started work: %s", n, getpid(), getppid(),ctime(&ttime)); //вывод информации о процессе
+		switch(n){
+			case 1: {char *args1[]={"ps", NULL};
+					printf("ps\n");
+					execv("/bin/ps",args1);
+					break;}
+			case 2: printf("cat prg.c\n");
+					execl("/bin/cat", "cat", "prg.c", NULL); 
+					break;
+			case 3: printf("ping google.com\n");
+					char *args3[]={"ping","-c 1", "google.com", NULL};
+					execvp("ping", args3); 
+					break;
+			case 4: printf("ls -l \n");
+					execlp("ls", "-l", NULL); 
+					break;}}
+		int status;
+		wait(&status); //ожидание завершения child
+		if(WIFEXITED(status) != 0){ //если статус завершения процесса оличен от 0, то он завершился успешно
+			ttime = time(NULL);
+			printf("Child process (%d) Finish work: %s", n, ctime(&ttime));}
+		else perror("Error"); //вывод об ошибке
+	printf("---------------------------------------------\n");}
+
+int main (int argc, char* argv[]) {
+	long int ttime = time(NULL);
+	printf("Program %s PID: %d PPID: %d START: %s\n", argv[0], getpid(), getppid(), ctime(&ttime));//вывод информации о запущенной программе
+	int n;
+	for(int i = 1; i< argc; i++){
+		n = atoi(argv[i]);
+		switch(n) {
+			case 1: {CreateProcess(n); break;}
+			case 2: {CreateProcess(n); break;}
+			case 3: {CreateProcess(n); break;}
+			case 4: {CreateProcess(n); break;}
+			default: printf("Error\n"); break;}}
+	printf("Program %s PID: %d FINISH: %s", argv[0], getpid(), ctime(&ttime));
+	return 0;
+}
